@@ -1,0 +1,64 @@
+```
+# Environment variables
+.env.local
+.env.local.example
+
+# Dependencies
+node_modules/
+.yarn/
+npm-debug.log*
+$RECYCLE.BIN/
+*.local/share/virtualenv/
+.venv/
+venv/
+.env
+.env.*
+
+# Build outputs
+dist/
+build/
+.next/
+.nuxt/
+public/dist/
+out/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Editor specific
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Coverage reports
+coverage/
+*.lcov
+*.profdata
+.htmlcov/
+
+# Testing
+.pytest_cache/
+.coverage
+coverage.xml
+junit.xml
+
+# Database
+*.db
+*.db-journal
+supabase/
+```
