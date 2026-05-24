@@ -1,298 +1,434 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { generateSchedule, getSchedule, updateScheduleObservation } from '@/lib/services/escala-service';
-import { Button, Card, Badge } from '@/components/ui';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useUser } from '@clerk/nextjs';
+import {
+  fetchScales,
+  generateSchedules,
+  exportScalePdf,
+  updateSchedule, // Novo: API para salvar ajustes manuais
+  ScaleData,
+  ScheduleItem
+} from '@/lib/api';
+import ScaleMatrix from '@/components/dashboard/ScaleMatrix';
+import { toast } from 'sonner';
+import {
+  Calendar,
+  RefreshCw,
+  FileText,
+  Printer,
+  Loader2,
+  Users,
+  Clock,
+  AlertCircle,
+  Plus,
+  GripVertical,
+  Save,
+  X,
+  RotateCcw
+} from 'lucide-react';
 
-interface ScheduleEntry {
-  id: string;
-  date: string;
-  employee_name: string;
-  sector: string;
-  shift: string;
-  start_time: string;
-  end_time: string;
-  is_day_off: boolean;
-  observation: string;
+// ───────────────────────────────────────────────
+// Types
+// ───────────────────────────────────────────────
+
+interface DragItem {
+  scheduleId: string;
+  sourceDay: number;
+  sourceIndex: number;
 }
 
-interface Employee {
-  id: string;
-  name: string;
-  sector: string;
-  shift: string;
+// ───────────────────────────────────────────────
+// Sub-components
+// ───────────────────────────────────────────────
+
+function LoadingState() {
+  return (
+    <div className="flex flex-col items-center justify-center py-16 gap-3">
+      <Loader2 size={32} className="text-slate-400 animate-spin" />
+      <p className="text-sm text-slate-500">Carregando escalas...</p>
+    </div>
+  );
 }
+
+function EmptyState({ onGenerate, isGenerating }: { onGenerate: () => void; isGenerating: boolean }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-16 px-8 text-center">
+      <div className="w-14 h-14 bg-slate-100 rounded-full flex items-center justify-center mb-4">
+        <Users size={24} className="text-slate-400" />
+      </div>
+      <h3 className="text-base font-semibold text-slate-900 mb-1">
+        Nenhuma escala encontrada
+      </h3>
+      <p className="text-sm text-slate-500 mb-6 max-w-sm">
+        Gere automaticamente a escala de trabalho com base nos colaboradores cadastrados.
+      </p>
+      <button
+        onClick={onGenerate}
+        disabled={isGenerating}
+        className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 shadow-sm"
+      >
+        {isGenerating ? (
+          <Loader2 size={16} className="animate-spin" />
+        ) : (
+          <Plus size={16} />
+        )}
+        {isGenerating ? 'Gerando...' : 'Gerar Escala Automática'}
+      </button>
+    </div>
+  );
+}
+
+function ErrorState({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-16 px-8 text-center">
+      <div className="w-14 h-14 bg-red-50 rounded-full flex items-center justify-center mb-4">
+        <AlertCircle size={24} className="text-red-500" />
+      </div>
+      <h3 className="text-base font-semibold text-slate-900 mb-1">
+        Erro ao carregar dados
+      </h3>
+      <p className="text-sm text-slate-500 mb-4">
+        Não foi possível carregar as escalas. Tente novamente.
+      </p>
+      <button
+        onClick={onRetry}
+        className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-200 transition-colors"
+      >
+        <RefreshCw size={16} />
+        Tentar novamente
+      </button>
+    </div>
+  );
+}
+
+function EditModeBanner({
+  hasChanges,
+  onSave,
+  onCancel,
+  isSaving
+}: {
+  hasChanges: boolean;
+  onSave: () => void;
+  onCancel: () => void;
+  isSaving: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-between px-4 py-3 bg-blue-50 border border-blue-200 rounded-lg">
+      <div className="flex items-center gap-2 text-sm text-blue-800">
+        <GripVertical size={16} />
+        <span className="font-medium">
+          Modo edição: arraste os turnos para ajustar manualmente
+        </span>
+      </div>
+      <div className="flex items-center gap-2">
+        {hasChanges && (
+          <span className="text-xs text-blue-600 font-medium">
+            Alterações pendentes
+          </span>
+        )}
+        <button
+          onClick={onCancel}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-md hover:bg-slate-50 transition-colors"
+        >
+          <RotateCcw size={14} />
+          Descartar
+        </button>
+        <button
+          onClick={onSave}
+          disabled={!hasChanges || isSaving}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {isSaving ? (
+            <Loader2 size={14} className="animate-spin" />
+          ) : (
+            <Save size={14} />
+          )}
+          Salvar
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ───────────────────────────────────────────────
+// Main Page
+// ───────────────────────────────────────────────
 
 export default function EscalasPage() {
-  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
-  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
-  const [schedule, setSchedule] = useState<ScheduleEntry[]>([]);
-  const [loading, setLoading] = useState(false);
+  const { user } = useUser();
+  const [data, setData] = useState<ScaleData | null>(null);
+  const [originalData, setOriginalData] = useState<ScaleData | null>(null); // Backup para reset
+  const [isLoading, setIsLoading] = useState(true);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-  const [editingObservation, setEditingObservation] = useState<{id: string, value: string} | null>(null);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
+  const [draggedItem, setDraggedItem] = useState<DragItem | null>(null);
 
-  const monthNames = [
-    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
-  ];
+  const loadData = useCallback(async () => {
+    if (!user?.id) return;
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const tenantId = user.publicMetadata?.tenant_id as string;
+      const scaleData = await fetchScales(user.id, tenantId);
+      setData(scaleData);
+      setOriginalData(JSON.parse(JSON.stringify(scaleData))); // Deep copy para backup
+      setLastUpdated(new Date());
+    } catch (err) {
+      console.error('Error loading scale data:', err);
+      setError('Falha ao carregar dados da escala');
+      toast.error('Erro ao carregar dados da escala');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user]);
 
   useEffect(() => {
-    loadSchedule();
-  }, [currentMonth, currentYear]);
+    loadData();
+  }, [loadData]);
 
-  async function loadSchedule() {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await getSchedule(currentMonth, currentYear);
-      setSchedule(data || []);
-    } catch (err) {
-      setError('Erro ao carregar escala. Verifique se há funcionários cadastrados.');
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  }
+  // ─── Drag & Drop Handlers ───
 
-  async function handleGenerateSchedule() {
-    if (!confirm(`Deseja gerar a escala automática para ${monthNames[currentMonth - 1]} de ${currentYear}?`)) {
-      return;
-    }
+  const handleDragStart = useCallback((item: DragItem) => {
+    setDraggedItem(item);
+  }, []);
 
-    setLoading(true);
-    setError(null);
-    setSuccess(null);
+  const handleDragOver = useCallback((e: React.DragEvent, targetDay: number, targetIndex: number) => {
+    e.preventDefault();
+    if (!draggedItem || !data) return;
+
+    // Evitar drop no mesmo lugar
+    if (draggedItem.sourceDay === targetDay && draggedItem.sourceIndex === targetIndex) return;
+
+    // Criar nova cópia dos dados com o item movido
+    const newData = JSON.parse(JSON.stringify(data)) as ScaleData;
+    const sourceDay = newData.days[draggedItem.sourceDay];
+    const targetDayData = newData.days[targetDay];
+
+    if (!sourceDay || !targetDayData) return;
+
+    // Remover do source
+    const [movedItem] = sourceDay.schedules.splice(draggedItem.sourceIndex, 1);
     
+    // Inserir no target
+    targetDayData.schedules.splice(targetIndex, 0, movedItem);
+
+    setData(newData);
+    setHasChanges(true);
+  }, [draggedItem, data]);
+
+  const handleDragEnd = useCallback(() => {
+    setDraggedItem(null);
+  }, []);
+
+  const handleSaveChanges = useCallback(async () => {
+    if (!user?.id || !data) return;
+
+    setIsSaving(true);
     try {
-      const result = await generateSchedule(currentMonth, currentYear);
-      setSuccess(`Escala gerada com sucesso! ${result.count} lançamentos criados.`);
-      await loadSchedule();
-    } catch (err: any) {
-      setError(err.message || 'Erro ao gerar escala');
+      const tenantId = user.publicMetadata?.tenant_id as string;
+      await updateSchedule(user.id, data, tenantId);
+      setOriginalData(JSON.parse(JSON.stringify(data)));
+      setHasChanges(false);
+      setIsEditMode(false);
+      toast.success('Escala atualizada com sucesso!');
+    } catch (err) {
+      console.error('Error saving changes:', err);
+      toast.error('Erro ao salvar alterações');
     } finally {
-      setLoading(false);
+      setIsSaving(false);
     }
-  }
+  }, [user, data]);
 
-  async function handleSaveObservation(assignmentId: string, observation: string) {
+  const handleDiscardChanges = useCallback(() => {
+    if (originalData) {
+      setData(JSON.parse(JSON.stringify(originalData)));
+    }
+    setHasChanges(false);
+    setIsEditMode(false);
+    setDraggedItem(null);
+    toast.info('Alterações descartadas');
+  }, [originalData]);
+
+  // ─── Action Handlers ───
+
+  const handleGenerate = useCallback(async () => {
+    if (!user?.id) return;
+
+    setIsGenerating(true);
+    setError(null);
+
     try {
-      await updateScheduleObservation(assignmentId, observation);
-      setSuccess('Observação atualizada com sucesso!');
-      setEditingObservation(null);
-      await loadSchedule();
-    } catch (err: any) {
-      setError('Erro ao atualizar observação');
+      const tenantId = user.publicMetadata?.tenant_id as string;
+      await generateSchedules(user.id, tenantId);
+      toast.success('Escala gerada automaticamente com sucesso!');
+      await loadData();
+    } catch (err) {
+      console.error('Error generating scale:', err);
+      toast.error('Erro ao gerar escala automática');
     } finally {
-      setTimeout(() => setSuccess(null), 3000);
+      setIsGenerating(false);
     }
-  }
+  }, [user, loadData]);
 
-  function handlePrevMonth() {
-    if (currentMonth === 1) {
-      setCurrentMonth(12);
-      setCurrentYear(currentYear - 1);
+  const handleExportPdf = useCallback(async () => {
+    if (!user?.id) return;
+
+    try {
+      await exportScalePdf(user.id);
+      toast.success('PDF exportado com sucesso!');
+    } catch (err) {
+      console.error('Error exporting PDF:', err);
+      toast.error('Erro ao exportar PDF');
+    }
+  }, [user]);
+
+  const handlePrint = useCallback(() => {
+    window.print();
+  }, []);
+
+  const toggleEditMode = useCallback(() => {
+    if (isEditMode && hasChanges) {
+      // Confirmar antes de sair com alterações pendentes
+      if (!confirm('Você tem alterações não salvas. Deseja sair do modo edição?')) {
+        return;
+      }
+      handleDiscardChanges();
     } else {
-      setCurrentMonth(currentMonth - 1);
+      setIsEditMode(prev => !prev);
     }
+  }, [isEditMode, hasChanges, handleDiscardChanges]);
+
+  // Loading inicial
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center h-full py-16">
+        <Loader2 size={24} className="text-slate-400 animate-spin" />
+      </div>
+    );
   }
-
-  function handleNextMonth() {
-    if (currentMonth === 12) {
-      setCurrentMonth(1);
-      setCurrentYear(currentYear + 1);
-    } else {
-      setCurrentMonth(currentMonth + 1);
-    }
-  }
-
-  // Agrupar escala por data e funcionário
-  const scheduleByDate = schedule.reduce((acc, entry) => {
-    const date = entry.date;
-    if (!acc[date]) acc[date] = [];
-    acc[date].push(entry);
-    return acc;
-  }, {} as Record<string, ScheduleEntry[]>);
-
-  // Obter dias únicos ordenados
-  const uniqueDates = Object.keys(scheduleByDate).sort();
-
-  // Obter funcionários únicos
-  const uniqueEmployees = Array.from(new Set(schedule.map(s => s.employee_name))).sort();
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-900">Escalas de Trabalho</h2>
-        
-        <div className="flex items-center gap-4">
-          <Button onClick={handlePrevMonth} variant="secondary">
-            ← Mês Anterior
-          </Button>
-          
-          <span className="text-lg font-semibold min-w-[200px] text-center">
-            {monthNames[currentMonth - 1]} de {currentYear}
-          </span>
-          
-          <Button onClick={handleNextMonth} variant="secondary">
-            Próximo Mês →
-          </Button>
-          
-          <Button onClick={handleGenerateSchedule} disabled={loading}>
-            Gerar Escala Automática
-          </Button>
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 mb-1 flex items-center gap-2">
+            <Calendar size={24} className="text-blue-600" />
+            Auxiliador de Escalas
+          </h1>
+          <p className="text-sm text-slate-500">
+            Gerencie a jornada de trabalho dos colaboradores.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {/* Edit Mode Toggle */}
+          {data && (
+            <button
+              onClick={toggleEditMode}
+              className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                isEditMode
+                  ? 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100'
+                  : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              <GripVertical size={16} />
+              {isEditMode ? 'Sair Edição' : 'Editar Manual'}
+            </button>
+          )}
+
+          {/* Secondary Actions */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handlePrint}
+              className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+              title="Imprimir escala"
+            >
+              <Printer size={16} />
+              <span className="hidden sm:inline">Imprimir</span>
+            </button>
+            <button
+              onClick={handleExportPdf}
+              className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+              title="Exportar PDF"
+            >
+              <FileText size={16} />
+              <span className="hidden sm:inline">PDF</span>
+            </button>
+          </div>
+
+          {/* Primary Action */}
+          <button
+            onClick={handleGenerate}
+            disabled={isGenerating}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+          >
+            {isGenerating ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <RefreshCw size={16} />
+            )}
+            {isGenerating ? 'Gerando...' : 'Gerar Escala'}
+          </button>
         </div>
       </div>
 
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-          {error}
+      {/* Edit Mode Banner */}
+      {isEditMode && (
+        <EditModeBanner
+          hasChanges={hasChanges}
+          onSave={handleSaveChanges}
+          onCancel={handleDiscardChanges}
+          isSaving={isSaving}
+        />
+      )}
+
+      {/* Info Bar */}
+      {lastUpdated && data && !isEditMode && (
+        <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 rounded-lg border border-slate-200 text-xs text-slate-500">
+          <Clock size={14} />
+          <span>
+            Última atualização: {lastUpdated.toLocaleDateString('pt-BR', {
+              day: '2-digit',
+              month: '2-digit',
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit'
+            })}
+          </span>
         </div>
       )}
 
-      {success && (
-        <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg">
-          {success}
-        </div>
-      )}
-
-      {loading && !schedule.length && (
-        <div className="text-center py-12">
-          <p className="text-gray-500">Carregando escala...</p>
-        </div>
-      )}
-
-      {!loading && schedule.length === 0 && (
-        <Card title="Nenhuma escala encontrada">
-          <p className="text-gray-600 mb-4">
-            Não há escalas cadastradas para este período. Clique em "Gerar Escala Automática" 
-            para criar uma nova escala baseada nas regras configuradas.
-          </p>
-        </Card>
-      )}
-
-      {schedule.length > 0 && (
-        <Card>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50">
-                    Data
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Funcionário
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Setor
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Turno
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Horário
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Observações
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {uniqueDates.map(date => {
-                  const dayEntries = scheduleByDate[date];
-                  const dateObj = new Date(date + 'T12:00:00');
-                  const dayOfWeek = dateObj.toLocaleDateString('pt-BR', { weekday: 'long' });
-                  
-                  return dayEntries.map((entry, idx) => (
-                    <tr key={entry.id} className={idx === 0 ? 'border-t-2 border-gray-300' : ''}>
-                      {idx === 0 && (
-                        <td 
-                          rowSpan={dayEntries.length} 
-                          className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 sticky left-0 bg-white"
-                        >
-                          {new Date(date + 'T12:00:00').toLocaleDateString('pt-BR')}
-                          <div className="text-xs text-gray-500 capitalize">{dayOfWeek}</div>
-                        </td>
-                      )}
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                        {entry.employee_name}
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 capitalize">
-                        {entry.sector}
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 capitalize">
-                        {entry.shift}
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                        {entry.start_time} às {entry.end_time}
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        {entry.is_day_off ? (
-                          <Badge variant="warning">Folga</Badge>
-                        ) : (
-                          <Badge variant="success">Trabalho</Badge>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-sm">
-                        {editingObservation?.id === entry.id ? (
-                          <div className="flex gap-2">
-                            <input
-                              type="text"
-                              value={editingObservation.value}
-                              onChange={(e) => setEditingObservation({ id: entry.id, value: e.target.value })}
-                              className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
-                              autoFocus
-                            />
-                            <Button 
-                              onClick={() => handleSaveObservation(entry.id, editingObservation.value)}
-                              variant="primary"
-                              className="px-2 py-1 text-xs"
-                            >
-                              Salvar
-                            </Button>
-                            <Button 
-                              onClick={() => setEditingObservation(null)}
-                              variant="secondary"
-                              className="px-2 py-1 text-xs"
-                            >
-                              Cancelar
-                            </Button>
-                          </div>
-                        ) : (
-                          <div 
-                            className="cursor-pointer hover:bg-gray-100 p-1 rounded"
-                            onClick={() => setEditingObservation({ id: entry.id, value: entry.observation || '' })}
-                          >
-                            {entry.observation || (
-                              <span className="text-gray-400 italic">Clique para adicionar...</span>
-                            )}
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  ));
-                })}
-              </tbody>
-            </table>
+      {/* Content */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
+        {isLoading ? (
+          <LoadingState />
+        ) : error ? (
+          <ErrorState onRetry={loadData} />
+        ) : !data ? (
+          <EmptyState onGenerate={handleGenerate} isGenerating={isGenerating} />
+        ) : (
+          <div className="p-4">
+            <ScaleMatrix
+              userId={user.id}
+              tenantId={user.publicMetadata?.tenant_id as string}
+              data={data}
+              onRefresh={loadData}
+              isEditMode={isEditMode}
+              onDragStart={handleDragStart}
+              onDragOver={handleDragOver}
+              onDragEnd={handleDragEnd}
+              draggedItem={draggedItem}
+            />
           </div>
-        </Card>
-      )}
-
-      <div className="mt-6 space-y-2">
-        <h3 className="font-semibold text-gray-700">Legenda:</h3>
-        <div className="flex gap-4 text-sm">
-          <div className="flex items-center gap-2">
-            <Badge variant="success">Trabalho</Badge>
-            <span>Funcionário em turno normal</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Badge variant="warning">Folga</Badge>
-            <span>Funcionário de folga (Segunda-feira ou Domingo rotativo)</span>
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );

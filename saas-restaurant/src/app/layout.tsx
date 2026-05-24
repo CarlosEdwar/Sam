@@ -1,22 +1,43 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import { ClerkProvider } from "@clerk/nextjs";
+import { ptBR } from "@clerk/localizations";
+import { Toaster } from "sonner";
+import { ThemeProvider } from "@/components/theme-provider";
+import { NextIntlClientProvider } from "next-intl";
+import { getMessages } from "next-intl/server";
 
 const inter = Inter({ subsets: ["latin"] });
 
+
 export const metadata: Metadata = {
-  title: "SaaS Restaurant - Gestão Completa",
-  description: "Sistema de gestão para restaurantes com estoque, escalas e etiquetas",
+  title: "Sam - Impressão de Etiquetas",
+  description: "Sistema de etiquetas para acompanhamento de produtos",
+  icons: {
+    icon: "/Person.ico",
+  },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const messages = await getMessages();
+
   return (
-    <html lang="pt-BR">
-      <body className={inter.className}>{children}</body>
-    </html>
+    <ClerkProvider localization={ptBR}>
+      <html lang="pt-BR" suppressHydrationWarning>
+        <body className={inter.className}>
+          <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+            <NextIntlClientProvider messages={messages}>
+              {children}
+              <Toaster richColors position="top-right" />
+            </NextIntlClientProvider>
+          </ThemeProvider>
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }

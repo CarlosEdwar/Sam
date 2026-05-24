@@ -1,0 +1,48 @@
+Modelando a Estrutura de Dados (O que o Backend Guarda)
+Você precisará de novas tabelas. Baseado nas regras de controle de ponto e jornada, a estrutura essencial seria :
+
+colaboradores: guarda os dados de cada funcionário (nome, cargo, setor).
+
+turnos: aqui você define os modelos de jornada (ex: "Manhã - 08h às 17h", "Noite - 22h às 05h").
+
+escalas: é a tabela principal que amarra tudo. Cada registro vincula um colaborador a um turno em uma data específica.
+
+disponibilidades (opcional, mas recomendado): permite que os colaboradores indiquem dias que não podem trabalhar, ajudando na criação da escala.
+
+2. A Lógica de Criação no Laravel (A Mágica Acontece no Backend)
+Você criará um algoritmo (um service) para gerar as escalas. 
+
+O Algoritmo de Escala: Você programará as regras de negócio. Por exemplo:
+
+Buscar todos os colaboradores de um setor.
+Buscar todos os turnos da semana.
+Distribuir os colaboradores nos turnos, respeitando as 44h semanais, o descanso de 11h entre turnos e a disponibilidade de cada um .
+Laravel Jobs: A geração de uma escala para uma equipe de 50 pessoas pode levar alguns segundos. Para não travar a tela para o usuário, você pode colocar essa tarefa em um Job (Fila). Assim, o usuário clica em "Gerar Escala", e o sistema avisa quando estiver pronta, rodando o processo em segundo plano .
+
+3. Construindo a Interface no Next.js 
+
+Dashboard de Controle:
+
+Tabela Visual: Uma exibição de escala no estilo "matriz", com colaboradores nas linhas e dias da semana nas colunas .
+
+Componente de Arrastar e Soltar: Com bibliotecas como react-beautiful-dnd, o gestor pode arrastar o nome de um funcionário de um turno para outro, e o sistema já atualiza a escala no banco de dados via API. É muito mais intuitivo do que editar linhas em uma planilha .
+
+Botões de Ação: Botões para "Gerar Nova Escala Automática", "Baixar em PDF" e "Imprimir".
+
+4. Regras e Validação (Não Esqueça a Lei!)
+Você pode adicionar verificações automáticas no backend que impedem, por exemplo:
+
+Alguém ser escalado para mais de 8 horas diárias, a menos que seja uma exceção com hora extra .
+
+Um funcionário ter turnos na madrugada e no dia seguinte sem o descanso de 11 horas .
+
+Cada funcionário terá um Domingo de folga no mês que será definido pelo Gestor/usuario.
+
+Resumo do Fluxo de Trabalho
+Gestor acessa o Dashboard (/escalas): O Next.js faz uma requisição GET para a API Laravel (/api/escalas/gerar).
+
+Backend Processa: O Laravel recebe a requisição, chama seu Job de geração de escala, aplica as regras e salva os horários no banco de dados.
+
+Frontend Atualiza: O Next.js recebe os dados atualizados e exibe a nova tabela de escala para o gestor .
+
+A lógica fica no frontend para ser rápida e responsiva .

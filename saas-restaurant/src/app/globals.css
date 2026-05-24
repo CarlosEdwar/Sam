@@ -3,31 +3,142 @@
 @tailwind utilities;
 
 :root {
-  --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 214, 219, 220;
-  --background-end-rgb: 255, 255, 255;
+  --primary: #0066FF;
+  --primary-hover: #0052CC;
+  --primary-subtle: #E6F0FF;
+  --secondary: #0F172A;
+  --bg-main: #F8FAFC;
+  --text-main: #0F172A;
+  --text-muted: #64748B;
+  --border: #E2E8F0;
+  --error: #EF4444;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --foreground-rgb: 255, 255, 255;
-    --background-start-rgb: 0, 0, 0;
-    --background-end-rgb: 0, 0, 0;
-  }
+.dark {
+  --primary: #3B82F6;
+  --primary-hover: #60A5FA;
+  --primary-subtle: #1E293B;
+  --secondary: #F8FAFC;
+  --bg-main: #0F172A;
+  --text-main: #F8FAFC;
+  --text-muted: #94A3B8;
+  --border: #1E293B;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
 body {
-  color: rgb(var(--foreground-rgb));
-  background: linear-gradient(
-      to bottom,
-      transparent,
-      rgb(var(--background-end-rgb))
-    )
-    rgb(var(--background-start-rgb));
+  background-color: var(--bg-main);
+  color: var(--text-main);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
+button {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+input {
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+/* ============================================================
+   Clerk – força tema claro independente do tema do sistema
+   Sobrescreve as variáveis internas reais usadas pelo Clerk
+   ============================================================ */
+
+/* Variáveis internas do Clerk (v7+) */
+.clerk-force-light {
+  --cl-colorBackground: #ffffff !important;
+  --cl-colorText: #0f172a !important;
+  --cl-colorPrimary: #2563eb !important;
+  --cl-colorShimmer: #e2e8f0 !important;
+  --cl-colorInputBackground: #f8fafc !important;
+  --cl-colorInputText: #0f172a !important;
+  --cl-colorTextSecondary: #64748b !important;
+  --cl-colorNeutral: #64748b !important;
+  --cl-colorDanger: #dc2626 !important;
+  --cl-colorSuccess: #059669 !important;
+  --cl-colorWarning: #d97706 !important;
+  color-scheme: light !important;
+}
+
+/* Garante fundo branco em qualquer elemento cl-* */
+:is(html, html.dark) .clerk-force-light [class^="cl-"],
+:is(html, html.dark) .clerk-force-light [class*=" cl-"] {
+  --cl-colorBackground: #ffffff !important;
+  --cl-colorInputBackground: #f8fafc !important;
+  background-color: var(--cl-colorBackground) !important;
+  color: #0f172a !important;
+  color-scheme: light !important;
+}
+
+/* Card e containers principais */
+:is(html, html.dark) .clerk-force-light [class*="cl-card"],
+:is(html, html.dark) .clerk-force-light [class*="cl-main"],
+:is(html, html.dark) .clerk-force-light [class*="cl-page"],
+:is(html, html.dark) .clerk-force-light [class*="cl-footer"],
+:is(html, html.dark) .clerk-force-light [class*="cl-rootBox"] {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+
+/* Inputs */
+:is(html, html.dark) .clerk-force-light input,
+:is(html, html.dark) .clerk-force-light select,
+:is(html, html.dark) .clerk-force-light textarea {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+  border-color: #e2e8f0 !important;
+  color-scheme: light !important;
+}
+
+/* Botão primário */
+:is(html, html.dark) .clerk-force-light button[data-variant="solid"],
+:is(html, html.dark) .clerk-force-light [class*="cl-formButtonPrimary"] {
+  background-color: #2563eb !important;
+  color: #ffffff !important;
+}
+
+/* Links */
+:is(html, html.dark) .clerk-force-light a {
+  color: #2563eb !important;
+}
+
+/* Textos genéricos */
+:is(html, html.dark) .clerk-force-light p,
+:is(html, html.dark) .clerk-force-light label,
+:is(html, html.dark) .clerk-force-light span:not([class*="icon"]):not([class*="Icon"]) {
+  color: #0f172a !important;
+}
+
+/* Divisores */
+:is(html, html.dark) .clerk-force-light [class*="divider"],
+:is(html, html.dark) .clerk-force-light [class*="Divider"] {
+  background-color: #e2e8f0 !important;
+  color: #64748b !important;
+}
+
+/* Botões sociais */
+:is(html, html.dark) .clerk-force-light [class*="socialButton"],
+:is(html, html.dark) .clerk-force-light [class*="cl-socialButtonsBlockButton"] {
+  background-color: #f8fafc !important;
+  border-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+/* Internals gerados pelo Clerk (hash classes) */
+:is(html, html.dark) .clerk-force-light [class*="cl-internal-"] {
+  background-color: transparent !important;
+  color: #0f172a !important;
+}
+
+/* Reset de background em shimmer/skeleton */
+:is(html, html.dark) .clerk-force-light [class*="cl-internal-"][style*="background"] {
+  background-color: #f1f5f9 !important;
 }

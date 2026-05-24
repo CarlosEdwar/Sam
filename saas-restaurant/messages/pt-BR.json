@@ -1,0 +1,16 @@
+{
+  "Common": {
+    "save": "Salvar",
+    "cancel": "Cancelar",
+    "success": "Operação realizada com sucesso"
+  },
+  "Settings": {
+    "title": "Preferências do Sistema",
+    "description": "Gerencie hardware, segurança e interface do Sam.",
+    "save": "Salvar Alterações",
+    "general": "Configurações Gerais",
+    "hardware": "Gestão de Hardware",
+    "security": "Segurança e Acesso",
+    "securityDesc": "Proteção de dados e logs de auditoria."
+  }
+}
