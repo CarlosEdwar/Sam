@@ -1,41 +1,34 @@
 ```
+# Supabase specific ignores
+supabase/.temp/
+supabase/storage/
+*.sql
+
 # Dependencies
 node_modules/
-
-# Build outputs
-dist/
-build/
-.next/
+.yarn/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
 # Environment variables
 .env
 .env.local
-*.env.*
-
-# IDE specific
-.vscode/
-.idea/
-*.swp
-*.swo
+.env.*
+!.env.example
 
 # Logs
 *.log
-
-# Python cache (if any Python components)
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
 # OS generated files
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
-
-# Coverage reports
-coverage/
-htmlcov/
-*.coverage
-
-# Temporary files
-*.tmp
 ```
