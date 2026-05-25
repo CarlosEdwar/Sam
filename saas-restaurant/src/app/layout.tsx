@@ -4,6 +4,7 @@ import "./globals.css";
 import { Toaster } from "sonner";
 import { ThemeProvider } from "@/components/theme-provider";
 import { NextIntlClientProvider } from "next-intl";
+import { getMessages } from "next-intl/server";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -20,7 +21,8 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // ⚠️ Não precisa mais de getMessages() – o next-intl/plugin e o request.ts cuidam disso
+  const messages = await getMessages();
+
   return (
     <html lang="pt-BR" suppressHydrationWarning>
       <body className={inter.className}>
