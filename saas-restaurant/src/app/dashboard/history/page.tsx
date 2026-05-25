@@ -1,11 +1,11 @@
 'use client';
 
 import { useState, useMemo, useCallback, useEffect } from 'react';
-import { 
-  History as HistoryIcon, 
-  Search, 
-  Filter, 
-  Calendar, 
+import {
+  History as HistoryIcon,
+  Search,
+  Filter,
+  Calendar,
   Download,
   AlertCircle,
   Printer,
@@ -17,8 +17,7 @@ import {
   ChevronRight,
   LucideIcon
 } from 'lucide-react';
-import { useUser } from '@clerk/nextjs';
-import { fetchPrintJobs, createPrintJob, PrintJob as ApiPrintJob } from '@/lib/api';
+import { fetchPrintJobs, createPrintJob } from '@/lib/services/print-service';
 
 // ───────────────────────────────────────────────
 // Types
@@ -238,7 +237,6 @@ function formatRelativeTime(isoString: string): string {
 // ───────────────────────────────────────────────
 
 export default function HistoryPage() {
-  const { user } = useUser();
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [search, setSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -247,11 +245,10 @@ export default function HistoryPage() {
   const [reprintingId, setReprintingId] = useState<string | null>(null);
 
   const fetchHistory = useCallback(async () => {
-    if (!user) return;
     setIsLoading(true);
     try {
-      const data = await fetchPrintJobs(user.id);
-      const mappedHistory: HistoryItem[] = data.map((job: ApiPrintJob) => ({
+      const data = await fetchPrintJobs();
+      const mappedHistory: HistoryItem[] = data.map((job: any) => ({
         id: String(job.id),
         jobId: job.jobId,
         timestamp: job.created_at,
@@ -269,7 +266,7 @@ export default function HistoryPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [user]);
+  }, []);
 
   useEffect(() => {
     fetchHistory();
@@ -277,10 +274,10 @@ export default function HistoryPage() {
 
   // ── Reimprimir ─────────────────────────────────────────────────────────
   const handleReprint = useCallback(async (item: HistoryItem) => {
-    if (!user || reprintingId) return;
+    if (reprintingId) return;
     setReprintingId(item.id);
     try {
-      await createPrintJob(user.id, {
+      await createPrintJob({
         jobId: `${item.jobId}-R${Date.now().toString(36).toUpperCase()}`,
         productName: item.productName,
         sku: item.sku,
@@ -297,7 +294,7 @@ export default function HistoryPage() {
     } finally {
       setReprintingId(null);
     }
-  }, [user, reprintingId, fetchHistory]);
+  }, [reprintingId, fetchHistory]);
 
   const filteredHistory = useMemo(() => {
     let filtered = [...history];

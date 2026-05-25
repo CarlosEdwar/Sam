@@ -1,15 +1,13 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { useUser } from '@clerk/nextjs';
 import {
-  fetchScales,
-  generateSchedules,
-  exportScalePdf,
-  updateSchedule, // Novo: API para salvar ajustes manuais
+  getSchedule as fetchScales,
+  generateSchedule as generateSchedules,
+  updateScheduleObservation as updateSchedule,
   ScaleData,
   ScheduleItem
-} from '@/lib/api';
+} from '@/lib/services/escala-service';
 import ScaleMatrix from '@/components/dashboard/ScaleMatrix';
 import { toast } from 'sonner';
 import {
@@ -156,7 +154,6 @@ function EditModeBanner({
 // ───────────────────────────────────────────────
 
 export default function EscalasPage() {
-  const { user } = useUser();
   const [data, setData] = useState<ScaleData | null>(null);
   const [originalData, setOriginalData] = useState<ScaleData | null>(null); // Backup para reset
   const [isLoading, setIsLoading] = useState(true);
@@ -169,14 +166,11 @@ export default function EscalasPage() {
   const [draggedItem, setDraggedItem] = useState<DragItem | null>(null);
 
   const loadData = useCallback(async () => {
-    if (!user?.id) return;
-
     setIsLoading(true);
     setError(null);
 
     try {
-      const tenantId = user.publicMetadata?.tenant_id as string;
-      const scaleData = await fetchScales(user.id, tenantId);
+      const scaleData = await fetchScales(new Date().getMonth() + 1, new Date().getFullYear());
       setData(scaleData);
       setOriginalData(JSON.parse(JSON.stringify(scaleData))); // Deep copy para backup
       setLastUpdated(new Date());
@@ -187,7 +181,7 @@ export default function EscalasPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [user]);
+  }, []);
 
   useEffect(() => {
     loadData();
@@ -228,23 +222,21 @@ export default function EscalasPage() {
   }, []);
 
   const handleSaveChanges = useCallback(async () => {
-    if (!user?.id || !data) return;
+    if (!data) return;
 
     setIsSaving(true);
     try {
-      const tenantId = user.publicMetadata?.tenant_id as string;
-      await updateSchedule(user.id, data, tenantId);
-      setOriginalData(JSON.parse(JSON.stringify(data)));
-      setHasChanges(false);
-      setIsEditMode(false);
-      toast.success('Escala atualizada com sucesso!');
+      // Aqui precisaríamos de uma função para salvar a escala inteira
+      // Como updateSchedule no service atualmente só salva observações,
+      // vamos assumir que precisamos de uma função de saveScale
+      toast.error('Funcionalidade de salvar escala completa ainda não implementada no Supabase');
     } catch (err) {
       console.error('Error saving changes:', err);
       toast.error('Erro ao salvar alterações');
     } finally {
       setIsSaving(false);
     }
-  }, [user, data]);
+  }, [data]);
 
   const handleDiscardChanges = useCallback(() => {
     if (originalData) {
@@ -259,14 +251,11 @@ export default function EscalasPage() {
   // ─── Action Handlers ───
 
   const handleGenerate = useCallback(async () => {
-    if (!user?.id) return;
-
     setIsGenerating(true);
     setError(null);
 
     try {
-      const tenantId = user.publicMetadata?.tenant_id as string;
-      await generateSchedules(user.id, tenantId);
+      await generateSchedules(new Date().getMonth() + 1, new Date().getFullYear());
       toast.success('Escala gerada automaticamente com sucesso!');
       await loadData();
     } catch (err) {
@@ -275,19 +264,17 @@ export default function EscalasPage() {
     } finally {
       setIsGenerating(false);
     }
-  }, [user, loadData]);
+  }, [loadData]);
 
   const handleExportPdf = useCallback(async () => {
-    if (!user?.id) return;
-
     try {
-      await exportScalePdf(user.id);
+      window.open(`${process.env.NEXT_PUBLIC_API_URL}/escalas/export/pdf`, '_blank');
       toast.success('PDF exportado com sucesso!');
     } catch (err) {
       console.error('Error exporting PDF:', err);
       toast.error('Erro ao exportar PDF');
     }
-  }, [user]);
+  }, []);
 
   const handlePrint = useCallback(() => {
     window.print();
@@ -304,15 +291,6 @@ export default function EscalasPage() {
       setIsEditMode(prev => !prev);
     }
   }, [isEditMode, hasChanges, handleDiscardChanges]);
-
-  // Loading inicial
-  if (!user) {
-    return (
-      <div className="flex items-center justify-center h-full py-16">
-        <Loader2 size={24} className="text-slate-400 animate-spin" />
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
@@ -417,8 +395,8 @@ export default function EscalasPage() {
         ) : (
           <div className="p-4">
             <ScaleMatrix
-              userId={user.id}
-              tenantId={user.publicMetadata?.tenant_id as string}
+              userId="system"
+              tenantId="system"
               data={data}
               onRefresh={loadData}
               isEditMode={isEditMode}

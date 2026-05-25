@@ -1,6 +1,6 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server';
+import { createClient, getUserContext } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { addMonths, startOfMonth, endOfMonth, eachDayOfInterval, format, isMonday, isSunday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -8,16 +8,45 @@ import { ptBR } from 'date-fns/locale';
 interface Employee {
   id: string;
   name: string;
+  role: string;
+  department: string;
   sector: 'administrativo' | 'bar' | 'cozinha' | 'salao';
   shift: 'manha' | 'tarde' | 'flexivel';
 }
 
-interface Shift {
+export interface Shift {
   id: string;
+  name: string;
   date: string;
   start_time: string;
   end_time: string;
+  duration_hours: number;
   sector: string;
+}
+
+export interface ScaleAssignment {
+  employee_id: string;
+  shift_id: string;
+  date: string;
+}
+
+export interface ScheduleItem {
+  id: string;
+  employee_id: string;
+  shift_id: string;
+  date: string;
+}
+
+export interface ScaleDay {
+  date: string;
+  schedules: ScheduleItem[];
+}
+
+export interface ScaleData {
+  employees: Employee[];
+  shifts: Shift[];
+  assignments: ScaleAssignment[];
+  days: ScaleDay[];
 }
 
 /**
@@ -28,20 +57,13 @@ interface Shift {
  * - Turnos: 07:00-15:00 (manhã) ou 15:00-23:00 (tarde)
  */
 export async function generateSchedule(month: number, year: number) {
-  const supabase = await createClient();
-  
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Não autorizado');
+  const { profile } = await getUserContext();
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('restaurant_id, role')
-    .eq('id', user.id)
-    .single();
-
-  if (!profile || profile.role !== 'admin') {
+  if (profile.role !== 'admin') {
     throw new Error('Apenas administradores podem gerar escalas');
   }
+
+  const supabase = await createClient();
 
   // Buscar funcionários do restaurante
   const { data: employees } = await supabase
@@ -106,8 +128,8 @@ export async function generateSchedule(month: number, year: number) {
 
         // Verifica se já teve folga neste mês
         const hasOffThisMonth = schedule.some(
-          s => s.employee_id === employee.id && 
-               s.is_day_off && 
+          s => s.employee_id === employee.id &&
+               s.is_day_off &&
                s.date.startsWith(`${year}-${String(month).padStart(2, '0')}`)
         );
 
@@ -172,7 +194,7 @@ export async function generateSchedule(month: number, year: number) {
         })
         .select('id')
         .single();
-      
+
       shiftId = newShift?.id;
     }
 
@@ -193,22 +215,15 @@ export async function generateSchedule(month: number, year: number) {
   return { success: true, count: schedule.length };
 }
 
-export async function getSchedule(month: number, year: number) {
+export async function getSchedule(month: number, year: number): Promise<ScaleData> {
+  const { profile } = await getUserContext();
   const supabase = await createClient();
-  
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Não autorizado');
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('restaurant_id')
-    .eq('id', user.id)
-    .single();
 
   const startDate = format(startOfMonth(new Date(year, month - 1)), 'yyyy-MM-dd');
   const endDate = format(endOfMonth(new Date(year, month - 1)), 'yyyy-MM-dd');
 
-  const { data, error } = await supabase
+  // Fetch assignments and related data
+  const { data: assignments, error: assignError } = await supabase
     .from('schedule_assignments')
     .select(`
       *,
@@ -220,21 +235,56 @@ export async function getSchedule(month: number, year: number) {
     .eq('restaurant_id', profile.restaurant_id)
     .order('shifts.date');
 
-  if (error) throw new Error(error.message);
+  if (assignError) throw new Error(assignError.message);
 
-  return data;
+  // Fetch all employees and shifts for the restaurant
+  const { data: employees } = await supabase
+    .from('employees')
+    .select('*')
+    .eq('restaurant_id', profile.restaurant_id);
+
+  const { data: shifts } = await supabase
+    .from('shifts')
+    .select('*')
+    .eq('restaurant_id', profile.restaurant_id);
+
+  // Transform assignments into the format expected by the frontend
+  const daysMap: Record<string, ScheduleItem[]> = {};
+
+  assignments?.forEach(assign => {
+    const date = assign.shifts?.date;
+    if (!date) return;
+
+    if (!daysMap[date]) daysMap[date] = [];
+    daysMap[date].push({
+      id: assign.id,
+      employee_id: assign.employee_id,
+      shift_id: assign.shift_id,
+      date: date,
+    });
+  });
+
+  const days = Object.entries(daysMap)
+    .map(([date, schedules]) => ({ date, schedules }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  return {
+    employees: employees || [],
+    shifts: shifts || [],
+    assignments: assignments || [],
+    days: days,
+  };
 }
 
 export async function updateScheduleObservation(assignmentId: string, observation: string) {
+  const { profile } = await getUserContext();
   const supabase = await createClient();
-  
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Não autorizado');
 
   const { error } = await supabase
     .from('schedule_assignments')
     .update({ observation })
-    .eq('id', assignmentId);
+    .eq('id', assignmentId)
+    .eq('restaurant_id', profile.restaurant_id);
 
   if (error) throw new Error(error.message);
 

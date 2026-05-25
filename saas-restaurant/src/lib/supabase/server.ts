@@ -25,3 +25,24 @@ export async function createClient() {
     }
   );
 }
+
+export async function getUserContext() {
+  const supabase = await createClient();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    throw new Error('Não autorizado');
+  }
+
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', user.id)
+    .single();
+
+  if (profileError || !profile) {
+    throw new Error('Perfil de usuário não encontrado');
+  }
+
+  return { user, profile };
+}

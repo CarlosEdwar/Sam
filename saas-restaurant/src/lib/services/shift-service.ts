@@ -3,77 +3,68 @@
 import { createClient, getUserContext } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 
-export async function getProducts() {
+export async function fetchShifts() {
   const { profile } = await getUserContext();
   const supabase = await createClient();
 
   const { data, error } = await supabase
-    .from('products')
+    .from('shifts')
     .select('*')
     .eq('restaurant_id', profile.restaurant_id)
-    .order('name');
+    .order('start_time');
 
   if (error) throw new Error(error.message);
 
   return data;
 }
 
-export async function createProduct(product: {
-  name: string;
-  sku: string;
-  stock_qty: number;
-}) {
+export async function createShift(shift: any) {
   const { profile } = await getUserContext();
   const supabase = await createClient();
 
-  const { error } = await supabase
-    .from('products')
+  const { data, error } = await supabase
+    .from('shifts')
     .insert({
-      ...product,
+      ...shift,
       restaurant_id: profile.restaurant_id,
-    });
+    })
+    .select()
+    .single();
 
   if (error) throw new Error(error.message);
 
-  revalidatePath('/dashboard/estoque');
-  return { success: true };
+  revalidatePath('/dashboard/shifts');
+  return data;
 }
 
-export async function updateStock(productId: string, newQty: number) {
+export async function updateShift(id: string, shift: any) {
   const { profile } = await getUserContext();
   const supabase = await createClient();
 
   const { error } = await supabase
-    .from('products')
-    .update({ stock_qty: newQty })
-    .eq('id', productId)
+    .from('shifts')
+    .update(shift)
+    .eq('id', id)
     .eq('restaurant_id', profile.restaurant_id);
 
   if (error) throw new Error(error.message);
 
-  revalidatePath('/dashboard/estoque');
+  revalidatePath('/dashboard/shifts');
   return { success: true };
 }
 
-export async function importProducts(items: any[]) {
+export async function deleteShift(id: string) {
   const { profile } = await getUserContext();
   const supabase = await createClient();
 
-  const formattedItems = items.map(item => ({
-    name: item.name,
-    sku: item.sku,
-    stock_qty: item.stock,
-    restaurant_id: profile.restaurant_id,
-    // Category might be needed if the schema supports it
-  }));
-
-  const { data, error } = await supabase
-    .from('products')
-    .insert(formattedItems)
-    .select();
+  const { error } = await supabase
+    .from('shifts')
+    .delete()
+    .eq('id', id)
+    .eq('restaurant_id', profile.restaurant_id);
 
   if (error) throw new Error(error.message);
 
-  revalidatePath('/dashboard/estoque');
-  return data;
+  revalidatePath('/dashboard/shifts');
+  return { success: true };
 }

@@ -1,4 +1,4 @@
-import { SignUp } from "@clerk/nextjs";
+
 import Image from 'next/image';
 
 export default function SignUpPage() {
@@ -34,7 +34,7 @@ export default function SignUpPage() {
 
         {/* SignUp Card */}
         <section className="overflow-hidden rounded-2xl bg-white shadow-xl shadow-slate-900/20">
-          <SignUp
+          <SignUpForm
             path="/signup"
             routing="path"
             appearance={{

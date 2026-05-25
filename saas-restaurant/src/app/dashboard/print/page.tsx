@@ -1,13 +1,13 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { 
-  Printer, 
-  Settings2, 
-  Package, 
-  ChevronDown, 
-  Hash, 
-  Monitor, 
+import {
+  Printer,
+  Settings2,
+  Package,
+  ChevronDown,
+  Hash,
+  Monitor,
   Info,
   CheckCircle,
   Usb,
@@ -17,7 +17,6 @@ import {
   Loader2,
   LucideIcon
 } from 'lucide-react';
-import { useUser } from '@clerk/nextjs';
 import { apiFetch, API_URL } from '@/lib/api';
 import { toast } from 'sonner';
 
@@ -248,7 +247,6 @@ async function getConnectedUSBDevices(): Promise<USBDevice[]> {
 // ───────────────────────────────────────────────
 
 export default function PrintPage() {
-  const { user } = useUser();
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedProductId, setSelectedProductId] = useState('');
   const [quantity, setQuantity] = useState(1);
@@ -260,12 +258,11 @@ export default function PrintPage() {
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
 
   const fetchLabels = useCallback(async () => {
-    if (!user) return;
     setIsLoadingProducts(true);
     try {
-      const data = await apiFetch<any[]>('/labels', user.id);
+      const data = await apiFetch<any[]>('/labels', 'system');
       const fetchedLabels = Array.isArray(data) ? data : (data as any).data || [];
-      
+
       const mapped: Product[] = fetchedLabels.map((label: any) => ({
         id: String(label.id),
         name: label.produto,
@@ -282,7 +279,7 @@ export default function PrintPage() {
     } finally {
       setIsLoadingProducts(false);
     }
-  }, [user]);
+  }, []);
 
   useEffect(() => {
     fetchLabels();
@@ -329,8 +326,8 @@ export default function PrintPage() {
   }, []);
 
   const handlePrint = useCallback(async () => {
-    if (!selectedProduct || !user) return;
-    
+    if (!selectedProduct) return;
+
     setIsPrinting(true);
     setError(null);
     setPrintStatus('idle');
@@ -338,8 +335,8 @@ export default function PrintPage() {
     try {
       // Simulação de envio para impressora
       await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      await apiFetch('/print-jobs', user.id, {
+
+      await apiFetch('/print-jobs', 'system', {
         method: 'POST',
         json: {
           jobId: `JOB-${Date.now()}`,
@@ -347,7 +344,7 @@ export default function PrintPage() {
           sku: selectedProduct.sku,
           quantity: quantity,
           status: 'success',
-          operator: user.primaryEmailAddress?.emailAddress || 'admin@sam.com',
+          operator: 'admin@sam.com',
           printer: usbDevice?.productName || 'ZDesigner GC420t',
           method: printMethod,
         },
@@ -363,7 +360,7 @@ export default function PrintPage() {
     } finally {
       setIsPrinting(false);
     }
-  }, [selectedProduct, quantity, printMethod, user, usbDevice]);
+  }, [selectedProduct, quantity, printMethod, usbDevice]);
 
   return (
     <div className="space-y-6">

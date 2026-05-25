@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useUser } from "@clerk/nextjs";
-import { fetchEmployees, createEmployee, updateEmployee, deleteEmployee, Employee } from "@/lib/api";
+import { fetchEmployees, createEmployee, updateEmployee, deleteEmployee } from "@/lib/services/employee-service";
+import { Employee } from "@/lib/api";
 import { toast } from "sonner";
 import {
   Plus,
@@ -15,7 +15,6 @@ import {
 } from "lucide-react";
 
 export default function EmployeesPage() {
-  const { user } = useUser();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -29,10 +28,9 @@ export default function EmployeesPage() {
   });
 
   const loadEmployees = async () => {
-    if (!user?.id) return;
     try {
       setIsLoading(true);
-      const data = await fetchEmployees(user.id);
+      const data = await fetchEmployees();
       setEmployees(data);
     } catch (error) {
       toast.error("Erro ao carregar funcionários");
@@ -43,7 +41,7 @@ export default function EmployeesPage() {
 
   useEffect(() => {
     loadEmployees();
-  }, [user]);
+  }, []);
 
   const openModal = (employee?: Employee) => {
     if (employee) {
@@ -63,19 +61,20 @@ export default function EmployeesPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user?.id) return;
 
     try {
       const payload = {
-        ...formData,
+        name: formData.name,
+        role: formData.role,
+        department: formData.department,
         day_off: formData.day_off === "none" ? null : parseInt(formData.day_off)
       };
 
       if (editingEmployee) {
-        await updateEmployee(user.id, editingEmployee.id, payload);
+        await updateEmployee(editingEmployee.id, payload);
         toast.success("Funcionário atualizado");
       } else {
-        await createEmployee(user.id, payload);
+        await createEmployee(payload);
         toast.success("Funcionário cadastrado");
       }
 
@@ -88,18 +87,15 @@ export default function EmployeesPage() {
 
   const handleDelete = async (id: string) => {
     if (!confirm("Tem certeza que deseja remover este funcionário?")) return;
-    if (!user?.id) return;
 
     try {
-      await deleteEmployee(user.id, id);
+      await deleteEmployee(id);
       toast.success("Funcionário removido");
       loadEmployees();
     } catch (error) {
       toast.error("Erro ao remover funcionário");
     }
   };
-
-  if (!user) return <div className="p-8 text-center">Carregando usuário...</div>;
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -146,9 +142,9 @@ export default function EmployeesPage() {
                   <td className="p-4 text-slate-600 dark:text-slate-400">{emp.department}</td>
                   <td className="p-4">
                     <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                      emp.day_off !== undefined ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200" : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+                      emp.day_off !== null && emp.day_off !== undefined ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200" : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
                     }`}>
-                      {emp.day_off !== undefined ? ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"][emp.day_off] : "Nenhuma"}
+                      {emp.day_off !== null && emp.day_off !== undefined ? ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"][emp.day_off] : "Nenhuma"}
                     </span>
                   </td>
                   <td className="p-4 text-right">

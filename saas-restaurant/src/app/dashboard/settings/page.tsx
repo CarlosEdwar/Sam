@@ -3,13 +3,11 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useTheme } from 'next-themes';
 import { useTranslations } from 'next-intl';
-import { useUser } from '@clerk/nextjs';
-import { UserProfile } from '@clerk/nextjs';
-import { 
-  Globe, 
-  Moon, 
-  Printer, 
-  Cpu, 
+import {
+  Globe,
+  Moon,
+  Printer,
+  Cpu,
   Save,
   ShieldCheck,
   ChevronRight,
@@ -23,7 +21,7 @@ import {
   X,
   LucideIcon
 } from 'lucide-react';
-import { fetchSettings, saveSystemPrefs, ApiError } from '@/lib/api';
+import { fetchSettings, saveSystemPrefs } from '@/lib/services/settings-service';
 import { toast } from 'sonner';
 
 // ───────────────────────────────────────────────
@@ -143,7 +141,7 @@ function SettingCard({
 export default function SettingsPage() {
   const t = useTranslations('Settings');
   const { theme, setTheme } = useTheme();
-  const { user } = useUser();
+
 
   const [state, setState] = useState<SystemState>(DEFAULT_STATE);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
@@ -152,9 +150,8 @@ export default function SettingsPage() {
 
   // ── Load from backend on mount ──────────────────────────────────────────
   useEffect(() => {
-    if (!user) return;
     setIsLoading(true);
-    fetchSettings(user.id)
+    fetchSettings()
       .then((data) => {
         const prefs = data.system_prefs;
         setState(prev => ({
@@ -167,12 +164,10 @@ export default function SettingsPage() {
         if (prefs.theme) setTheme(prefs.theme);
       })
       .catch((err) => {
-        if (!(err instanceof ApiError && err.status === 401)) {
-          console.error('Erro ao carregar configurações:', err);
-        }
+        console.error('Erro ao carregar configurações:', err);
       })
       .finally(() => setIsLoading(false));
-  }, [user?.id, setTheme]);
+  }, [setTheme]);
 
   // ── Server health check ────────────────────────────────────────────────
   useEffect(() => {
@@ -203,10 +198,9 @@ export default function SettingsPage() {
 
   // ── Save system prefs to backend ────────────────────────────────────────
   const handleSave = useCallback(async () => {
-    if (!user) return;
     setSaveStatus('saving');
     try {
-      await saveSystemPrefs(user.id, {
+      await saveSystemPrefs({
         language:    state.language,
         timezone:    state.timezone,
         theme:       state.theme,
@@ -220,7 +214,7 @@ export default function SettingsPage() {
       setSaveStatus('error');
       toast.error('Erro ao salvar no banco de dados.');
     }
-  }, [user, state]);
+  }, [state]);
 
   // ── WebUSB printer search ───────────────────────────────────────────────
   const handleSearchPrinter = useCallback(async () => {

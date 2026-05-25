@@ -1,14 +1,13 @@
 'use client';
 
 import { useMemo, useState, useEffect, useCallback } from 'react';
-import { useUser } from '@clerk/nextjs';
-import { 
-  BarChart3, 
-  Clock, 
-  Printer, 
-  Zap, 
-  Package, 
-  FileText, 
+import {
+  BarChart3,
+  Clock,
+  Printer,
+  Zap,
+  Package,
+  FileText,
   Plus,
   ArrowUpRight,
   History,
@@ -21,7 +20,7 @@ import {
   Users
 } from 'lucide-react';
 import Link from 'next/link';
-import { fetchPrintJobs, PrintJob, API_URL } from '@/lib/api';
+import { fetchPrintJobs } from '@/lib/services/print-service';
 
 // ───────────────────────────────────────────────
 // Types
@@ -244,8 +243,6 @@ function HelpCard() {
 // ───────────────────────────────────────────────
 
 export default function DashboardPage() {
-  const { user } = useUser();
-
   const [statsData, setStatsData] = useState({
     totalImpressions: 0,
     pendingLabels: 0,
@@ -253,17 +250,16 @@ export default function DashboardPage() {
     performance: '-',
   });
 
+
   const [recentJobs, setRecentJobs] = useState<PrintJob[]>([]);
   const [isLoadingJobs, setIsLoadingJobs] = useState(true);
 
   // ── Fetch dashboard stats ─────────────────────────────────────────────
   useEffect(() => {
     async function fetchStats() {
-      if (!user) return;
       try {
-        const res = await fetch(`${API_URL}/dashboard/stats`, {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/dashboard/stats`, {
           headers: {
-            'X-Clerk-User-Id': user.id,
             Accept: 'application/json',
           },
         });
@@ -276,14 +272,13 @@ export default function DashboardPage() {
       }
     }
     fetchStats();
-  }, [user]);
+  }, []);
 
   // ── Fetch recent print jobs ───────────────────────────────────────────
   const loadJobs = useCallback(async () => {
-    if (!user) return;
     setIsLoadingJobs(true);
     try {
-      const jobs = await fetchPrintJobs(user.id);
+      const jobs = await fetchPrintJobs();
       // Show only the 5 most recent
       setRecentJobs(
         [...jobs]
@@ -295,7 +290,7 @@ export default function DashboardPage() {
     } finally {
       setIsLoadingJobs(false);
     }
-  }, [user]);
+  }, []);
 
   useEffect(() => {
     loadJobs();

@@ -1,17 +1,16 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
-import { useUser } from '@clerk/nextjs';
-import { 
-  Save, 
-  Check, 
-  Loader2, 
-  Printer, 
-  Ruler, 
+import {
+  Save,
+  Check,
+  Loader2,
+  Printer,
+  Ruler,
   Settings2,
   AlertCircle
 } from 'lucide-react';
-import { fetchSettings, saveAppConfig, ApiError } from '@/lib/api';
+import { fetchSettings, saveAppConfig } from '@/lib/services/settings-service';
 
 // ───────────────────────────────────────────────
 // Types
@@ -107,26 +106,22 @@ function SaveStatus({ status }: { status: 'idle' | 'saving' | 'success' | 'error
 // ───────────────────────────────────────────────
 
 export default function ConfiguracoesPage() {
-  const { user } = useUser();
   const [config, setConfig] = useState<AppConfig>(DEFAULT_CONFIG);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
   const [isLoaded, setIsLoaded] = useState(false);
 
   // ── Load app_config from backend on mount ───────────────────────────────
   useEffect(() => {
-    if (!user) return;
-    fetchSettings(user.id)
+    fetchSettings()
       .then((data) => {
         const cfg = data.app_config;
         setConfig(prev => ({ ...prev, ...cfg }));
       })
       .catch((err) => {
-        if (!(err instanceof ApiError && err.status === 401)) {
-          console.error('Erro ao carregar configurações de app:', err);
-        }
+        console.error('Erro ao carregar configurações de app:', err);
       })
       .finally(() => setIsLoaded(true));
-  }, [user]);
+  }, []);
 
   const updateConfig = useCallback(<K extends keyof AppConfig>(
     key: K,
@@ -138,7 +133,6 @@ export default function ConfiguracoesPage() {
 
   // ── Save to backend ─────────────────────────────────────────────────────
   const handleSalvar = useCallback(async () => {
-    if (!user) return;
     if (!config.defaultPrinter.trim()) {
       setSaveStatus('error');
       return;
@@ -146,14 +140,14 @@ export default function ConfiguracoesPage() {
 
     setSaveStatus('saving');
     try {
-      await saveAppConfig(user.id, config);
+      await saveAppConfig(config);
       setSaveStatus('success');
       setTimeout(() => setSaveStatus('idle'), 3000);
     } catch (err) {
       console.error('Erro ao salvar configurações de app:', err);
       setSaveStatus('error');
     }
-  }, [user, config]);
+  }, [config]);
 
   if (!isLoaded) {
     return (

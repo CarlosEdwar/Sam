@@ -25,7 +25,7 @@ Sam é uma aplicação moderna de alto desempenho desenvolvida para facilitar a 
 - **Gestão Simplificada**: Interface limpa para adicionar e monitorar o inventário, com badges visuais reativos a baixos níveis de estoque. A API precisará apenas persistir o array validado de `EstoqueItem`.
 
 ### 3. Segurança e UI/UX
-- **Autenticação**: Integrada via **Clerk**, com telas de Login e Sign-up personalizadas e seguras.
+- **Autenticação**: Integrada via **Supabase**, com telas de Login e Sign-up personalizadas e seguras.
 - **Design System**: Estética premium baseada em tons de Azul Vibrante (`#0066FF`) e Dark Navy (`#0F172A`).
 - **Responsividade**: Layout otimizado para diferentes resoluções, com correções de overflow e scroll horizontal.
 
@@ -34,7 +34,7 @@ Sam é uma aplicação moderna de alto desempenho desenvolvida para facilitar a 
 - **Framework**: [Next.js 14+](https://nextjs.org/) (App Router)
 - **Linguagem**: TypeScript
 - **Estilização**: Tailwind CSS / Vanilla CSS
-- **Autenticação**: [Clerk](https://clerk.com/)
+- **Autenticação**: [Supabase](https://supabase.com/)
 - **Processamento de Dados**: [SheetJS (XLSX)](https://sheetjs.com/)
 - **Icons**: Lucide React
 

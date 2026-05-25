@@ -1,8 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useUser } from "@clerk/nextjs";
-import { fetchShifts, createShift, updateShift, deleteShift, Shift } from "@/lib/api";
+import { fetchShifts, createShift, updateShift, deleteShift, Shift } from "@/lib/services/shift-service";
 import { toast } from "sonner";
 import {
   Plus,
@@ -14,7 +13,7 @@ import {
 } from "lucide-react";
 
 export default function ShiftsPage() {
-  const { user } = useUser();
+
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -28,10 +27,9 @@ export default function ShiftsPage() {
   });
 
   const loadShifts = async () => {
-    if (!user?.id) return;
     try {
       setIsLoading(true);
-      const data = await fetchShifts(user.id);
+      const data = await fetchShifts();
       setShifts(data);
     } catch (error) {
       toast.error("Erro ao carregar turnos");
@@ -42,7 +40,7 @@ export default function ShiftsPage() {
 
   useEffect(() => {
     loadShifts();
-  }, [user]);
+  }, [loadShifts]);
 
   const openModal = (shift?: Shift) => {
     if (shift) {
@@ -62,14 +60,13 @@ export default function ShiftsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user?.id) return;
 
     try {
       if (editingShift) {
-        await updateShift(user.id, editingShift.id, formData);
+        await updateShift(editingShift.id, formData);
         toast.success("Turno atualizado");
       } else {
-        await createShift(user.id, formData);
+        await createShift(formData);
         toast.success("Turno cadastrado");
       }
 
@@ -82,18 +79,15 @@ export default function ShiftsPage() {
 
   const handleDelete = async (id: string) => {
     if (!confirm("Tem certeza que deseja remover este turno?")) return;
-    if (!user?.id) return;
 
     try {
-      await deleteShift(user.id, id);
+      await deleteShift(id);
       toast.success("Turno removido");
       loadShifts();
     } catch (error) {
       toast.error("Erro ao remover turno");
     }
   };
-
-  if (!user) return <div className="p-8 text-center">Carregando usuário...</div>;
 
   return (
     <div className="flex flex-col gap-6 p-6">

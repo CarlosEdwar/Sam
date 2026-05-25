@@ -4,21 +4,19 @@ import { ReactNode, useMemo, useCallback } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useClerk } from '@clerk/nextjs';
-import { 
-  LayoutDashboard, 
-  Tag, 
-  Printer, 
-  History, 
-  Settings, 
-  LogOut, 
+import {
+  LayoutDashboard,
+  Tag,
+  Printer,
+  History,
+  Settings,
+  LogOut,
   Search,
   Bell,
   Package,
   Calendar,
   LucideIcon
 } from 'lucide-react';
-import { UserButton } from '@clerk/nextjs';
 
 // ───────────────────────────────────────────────
 // Types
@@ -176,7 +174,9 @@ function Header({ onSearch }: HeaderProps) {
             </span>
           </div>
           <div className="hover:scale-105 transition-transform cursor-pointer">
-            <UserButton />
+            <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 text-xs font-medium">
+              U
+            </div>
           </div>
         </div>
       </div>
@@ -191,14 +191,13 @@ function Header({ onSearch }: HeaderProps) {
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { signOut } = useClerk();
 
   const memoizedMenuItems = useMemo(() => MENU_ITEMS, []);
 
   const handleSignOut = useCallback(async () => {
-    await signOut();
+    console.log('Sign out requested');
     router.push('/login');
-  }, [signOut, router]);
+  }, [router]);
 
   return (
     <div className="flex min-h-screen bg-slate-50">

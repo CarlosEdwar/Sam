@@ -2,16 +2,16 @@
 
 import { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
-import { 
-  Tag, 
-  Search, 
-  Filter, 
-  Plus, 
-  FileUp, 
-  Download, 
-  MoreVertical, 
-  Printer, 
-  Check, 
+import {
+  Tag,
+  Search,
+  Filter,
+  Plus,
+  FileUp,
+  Download,
+  MoreVertical,
+  Printer,
+  Check,
   AlertCircle,
   X,
   FileSpreadsheet,
@@ -20,7 +20,6 @@ import {
   Loader2,
   Save
 } from 'lucide-react';
-import { useUser } from '@clerk/nextjs';
 import * as XLSX from 'xlsx';
 import { apiFetch, API_URL } from '@/lib/api';
 
@@ -228,7 +227,7 @@ function parseExcelFile(file: File): Promise<Partial<Label>[]> {
 // ───────────────────────────────────────────────
 
 export default function EtiquetasPage() {
-  const { user } = useUser();
+
   const [etiquetas, setEtiquetas] = useState<Label[]>([]);
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -254,11 +253,10 @@ export default function EtiquetasPage() {
   });
 
   const fetchEtiquetas = useCallback(async () => {
-    if (!user) return;
     setIsLoading(true);
     setError(null);
     try {
-      const data = await apiFetch<Label[]>('/labels', user.id);
+      const data = await apiFetch<Label[]>('/labels', "system");
       setEtiquetas(Array.isArray(data) ? data : (data as any).data || []);
     } catch (err) {
       console.error('Erro ao buscar etiquetas:', err);
@@ -303,7 +301,7 @@ export default function EtiquetasPage() {
     setIsImporting(true);
     try {
       const labels = await parseExcelFile(file);
-      const res = await apiFetch<any>('/labels/import', user.id, {
+      const res = await apiFetch<any>('/labels/import', "system", {
         method: 'POST',
         json: { labels },
       });
@@ -320,10 +318,9 @@ export default function EtiquetasPage() {
 
   const handleCreateLabel = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
     setIsLoading(true);
     try {
-      const created = await apiFetch<Label>('/labels', user.id, {
+      const created = await apiFetch<Label>('/labels', "system", {
         method: 'POST',
         json: newLabel,
       });

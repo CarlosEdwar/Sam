@@ -3,12 +3,11 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
-import { useUser } from '@clerk/nextjs';
-import { 
-  Package, 
-  Search, 
-  Filter, 
-  Plus, 
+import {
+  Package,
+  Search,
+  Filter,
+  Plus,
   MoreVertical,
   ArrowUpRight,
   AlertTriangle,
@@ -19,7 +18,7 @@ import {
   Save,
   LucideIcon
 } from 'lucide-react';
-import { apiFetch, API_URL } from '@/lib/api';
+import { getProducts, createProduct, updateStock, importProducts } from '@/lib/services/estoque-service';
 
 // ───────────────────────────────────────────────
 // Types
@@ -226,7 +225,6 @@ function parseExcelFile(file: File): Promise<Partial<EstoqueItem>[]> {
 // ───────────────────────────────────────────────
 
 export default function EstoquePage() {
-  const { user } = useUser();
   const [searchTerm, setSearchTerm] = useState('');
   const [inventory, setInventory] = useState<EstoqueItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -245,19 +243,18 @@ export default function EstoquePage() {
   });
 
   const fetchEstoque = useCallback(async () => {
-    if (!user) return;
     setIsLoading(true);
     setError(null);
     try {
-      const data = await apiFetch<EstoqueItem[]>('/inventory', user.id);
-      setInventory(Array.isArray(data) ? data : (data as any).data || []);
+      const data = await getProducts();
+      setInventory(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('Erro ao buscar estoque:', err);
       setError('Não foi possível carregar os dados do estoque.');
     } finally {
       setIsLoading(false);
     }
-  }, [user]);
+  }, []);
 
   useEffect(() => {
     fetchEstoque();
@@ -281,7 +278,7 @@ export default function EstoquePage() {
 
   const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !user) return;
+    if (!file) return;
 
     setIsImporting(true);
     setError(null);
@@ -289,12 +286,8 @@ export default function EstoquePage() {
     try {
       const items = await parseExcelFile(file);
 
-      const responseData = await apiFetch<any>('/inventory/import', user.id, {
-        method: 'POST',
-        json: { items },
-      });
+      const newItems = await importProducts(items);
 
-      const newItems = Array.isArray(responseData) ? responseData : responseData.data || [];
       setInventory(prev => [...newItems, ...prev]);
       toast.success(`${items.length} itens importados com sucesso!`);
     } catch (err) {
@@ -304,19 +297,19 @@ export default function EstoquePage() {
       setIsImporting(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
-  }, [user]);
+  }, []);
 
   const handleCreateItem = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
-    
+
     setIsImporting(true);
     try {
-      const created = await apiFetch<EstoqueItem>('/inventory', user.id, {
-        method: 'POST',
-        json: newItem,
+      await createProduct({
+        name: newItem.name,
+        sku: newItem.sku,
+        stock_qty: newItem.stock,
       });
-      setInventory(prev => [created, ...prev]);
+      await fetchEstoque();
       setIsModalOpen(false);
       setNewItem({ name: '', sku: '', category: 'Geral', stock: 0, min_stock: 10 });
       toast.success('Item cadastrado com sucesso!');
