@@ -4,6 +4,7 @@ import "./globals.css";
 import { Toaster } from "sonner";
 import { ThemeProvider } from "@/components/theme-provider";
 import { NextIntlClientProvider } from "next-intl";
+import { getMessages } from "next-intl/server";
 
 const inter = Inter({ subsets: ["latin"] });
 
