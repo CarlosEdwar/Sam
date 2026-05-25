@@ -20,12 +20,13 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // ⚠️ Não precisa mais de getMessages() – o next-intl/plugin e o request.ts cuidam disso
+  const messages = await getMessages();
+
   return (
     <html lang="pt-BR" suppressHydrationWarning>
       <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-          <NextIntlClientProvider>
+           <NextIntlClientProvider messages={messages}>
             {children}
             <Toaster richColors position="top-right" />
           </NextIntlClientProvider>
